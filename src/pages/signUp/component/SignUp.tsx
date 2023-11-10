@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User } from '../../../types/User'
+import { User } from '../../../types/type'
 import { post } from '../../../utils/apiUtils'
 
 function SignUp() {
@@ -24,11 +24,14 @@ function SignUp() {
   const handleOnSubmit = (event: React.ChangeEvent<HTMLFormElement>) => {
     event.preventDefault();
     console.log(JSON.stringify(formData));
-    const postResponse = post<User>("/users/signUp", formData);
+    const postResponse = post<User | Error>("/users/signUp", formData);
     postResponse.then(response  => {
       console.log("Response: "+JSON.stringify(response));
+      navigate("/login");
+    }).catch(response => {
+      console.log("Error: "+response.message);
     })
-    navigate("/login");
+    
   }
 
   return (

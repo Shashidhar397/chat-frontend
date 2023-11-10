@@ -1,11 +1,11 @@
 import axios, { AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 
-// Define the base URL for your API
-const baseURL = 'http://localhost:8080'; // Replace with your API's base URL
+// Default base URL
+const defaultBaseURL = 'http://localhost:8080'; // Replace with your default base URL
 
 // Create an instance of Axios with a custom configuration
 const api = axios.create({
-  baseURL,
+  baseURL: defaultBaseURL,
   timeout: 10000, // Adjust the timeout as needed
   headers: {
     'Content-Type': 'application/json',
@@ -30,6 +30,7 @@ const api = axios.create({
 api.interceptors.response.use(
   (response: AxiosResponse) => {
     // You can add global response logic here if needed
+    console.log(response);
     return response;
   },
   (error: AxiosError) => {
@@ -38,26 +39,38 @@ api.interceptors.response.use(
 );
 
 // Define a function to make HTTP GET requests
-export const get = async <T>(url: string, params?: AxiosRequestConfig): Promise<T> => {
-  const response = await api.get(url, params);
+export const get = async <T>(url: string, params?: AxiosRequestConfig, customBaseURL?: string): Promise<T> => {
+  const response = await api.get(url, {
+    ...params,
+    baseURL: customBaseURL || defaultBaseURL, // Use customBaseURL if provided, or defaultBaseURL
+  });
   return response.data as T;
 };
 
 // Define a function to make HTTP POST requests
-export const post = async <T>(url: string, data: any, config?: AxiosRequestConfig): Promise<T> => {
-  const response = await api.post(url, data, config);
+export const post = async <T>(url: string, data: any, config?: AxiosRequestConfig, customBaseURL?: string): Promise<T> => {
+  const response = await api.post(url, data, {
+    ...config,
+    baseURL: customBaseURL || defaultBaseURL, // Use customBaseURL if provided, or defaultBaseURL
+  });
   return response.data as T;
 };
 
 // Define a function to make HTTP PUT requests
-export const put = async <T>(url: string, data: any, config?: AxiosRequestConfig): Promise<T> => {
-  const response = await api.put(url, data, config);
+export const put = async <T>(url: string, data: any, config?: AxiosRequestConfig, customBaseURL?: string): Promise<T> => {
+  const response = await api.put(url, data, {
+    ...config,
+    baseURL: customBaseURL || defaultBaseURL, // Use customBaseURL if provided, or defaultBaseURL
+  });
   return response.data as T;
 };
 
 // Define a function to make HTTP DELETE requests
-export const del = async <T>(url: string, config?: AxiosRequestConfig): Promise<T> => {
-  const response = await api.delete(url, config);
+export const del = async <T>(url: string, config?: AxiosRequestConfig, customBaseURL?: string): Promise<T> => {
+  const response = await api.delete(url, {
+    ...config,
+    baseURL: customBaseURL || defaultBaseURL, // Use customBaseURL if provided, or defaultBaseURL
+  });
   return response.data as T;
 };
 

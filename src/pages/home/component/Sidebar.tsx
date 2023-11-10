@@ -1,5 +1,5 @@
 import React from 'react';
-import { User } from '../../../types/User';
+import { User } from '../../../types/type';
 
 interface SidebarProps {
   users: User[];
