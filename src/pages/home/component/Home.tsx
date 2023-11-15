@@ -7,6 +7,8 @@ import ChatPage from './ChatPage';
 import Sidebar from './Sidebar';
 import Stomp, { Client } from 'stompjs';
 import SockJS from 'sockjs-client';
+import Select from 'react-select';
+import SearchBox from './SearchBox';
 
 
 const initialStompClient: Client | null = null;
@@ -16,6 +18,9 @@ function Home() {
 
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [selectedOption, setSelectedOption] = useState<User | null>(null);
 
   const location = useLocation();
   const userData = location.state.userData;
@@ -27,19 +32,20 @@ function Home() {
   const [userMessages, setUserMessages] = useState<{ [uuid: string]: Message[] }>({});
 
   const handleSentMessages = (message: Message) => {
+    console.log("Message" + JSON.stringify(message));
     const newMessage = {
       uuid: message.uuid,
+      content: message.content,
       sender: message.sender,
       recipient: message.recipient,
-      content: message.content
+      messageType: message.messageType,
+      messageStatus: message.messageStatus
     }
     setUserMessages((prevUserMessages) => {
-      const recipientUuid = newMessage.recipient?.uuid || '';
-      const senderUuid = newMessage.sender?.uuid || '';
 
       return {
         ...prevUserMessages,
-        [recipientUuid]: [...(prevUserMessages[recipientUuid] || []), newMessage],
+        [message.recipient.uuid]: [...(prevUserMessages[message.recipient.uuid] || []), newMessage],
       };
     });
   }
@@ -47,7 +53,7 @@ function Home() {
   useEffect(() => {
     // Create a SockJS connection to your WebSocket server
     if (userData) {
-      const sock = new SockJS('http://localhost:8081/ws');
+      const sock = new SockJS('http://localhost:8083/ws');
 
       // Initialize the STOMP client
       const stomp = Stomp.over(sock);
@@ -56,19 +62,18 @@ function Home() {
 
         stomp.send("/chat-service/chat.addUser", {}, JSON.stringify({ uuid: userData.uuid, type: 'JOIN' }));
 
-        get<ChatSessionResponse>("/getSession/" + userData.uuid, undefined, "http://localhost:8081").then(response => {
+        get<ChatSessionResponse>("/getSession/" + userData.uuid, undefined, "http://localhost:8083").then(response => {
           // Subscribe to a chat topic
           stomp.subscribe('/chat-service-private/' + response.sessionId, (message) => {
             // Handle incoming messages
             const messageData = JSON.parse(message.body);
 
-            if (!usersList.some(user => user.uuid === messageData.sender.uuid)) {
-              setUsersList(prevUsersList => [...prevUsersList, messageData.sender]);
+            if (!usersList.some(user => user.uuid === messageData?.sender?.uuid)) {
+              setUsersList(prevUsersList => [...prevUsersList, messageData?.sender]);
             }
-            // Update messages for the recipient user
             setUserMessages((prevUserMessages) => ({
               ...prevUserMessages,
-              [messageData.sender.uuid]: [...(prevUserMessages[messageData.sender.uuid] || []), messageData],
+              [messageData?.sender?.uuid]: [...(prevUserMessages[messageData?.sender?.uuid] || []), messageData],
             }));
             
           });
@@ -88,38 +93,37 @@ function Home() {
     setSelectedUser(user);
   };
 
+  const handleSelectedUserFromSearch = (searchUser: User) => {
+    console.log("Selected user: "+JSON.stringify(searchUser));
+    console.log("usersList user: "+JSON.stringify(usersList));
+    if (searchUser && !usersList.some(user => searchUser.uuid === user.uuid)) {
+      console.log("coming here");
+      setUsersList(prevUsersList => [...prevUsersList, searchUser]);
+    }
+    console.log("usersList user: "+JSON.stringify(usersList));
+  };
+
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleSearchUser = (event: any) => {
-    if (searchTerm !== userData.email) {
-      const searchResponse = get<User>("/users/searchUser?email=" + searchTerm);
+    if (event.target.value !== userData.email) {
+      const searchResponse = get<User[]>("/users/searchUser?searchTerm=" + event.target.value);
       searchResponse.then(response => {
         console.log("Response : " + JSON.stringify(response));
-        if (!usersList.some(user => user.uuid === response.uuid)) {
-              setUsersList(prevUsersList => [...prevUsersList, response]);
-            }
 
       })
     }
 
   };
+  const handleUserSelect = (selected: User | null) => {
+    setSelectedOption(selected);
+  };
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-screen">
       <div className="bg-blue-500 text-white p-4">
         Welcome {userData.userName}
-        <div className="flex items-center space-x-2">
-          <input
-            type="text"
-            placeholder="Search users"
-            className="px-2 py-1.5 rounded border border-gray-300 text-black"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <button onClick={handleSearchUser} className="bg-blue-700 text-white px-3 py-1 rounded">
-            <i className="fas fa-search"></i> Search & Add
-          </button>
-        </div>
+        <SearchBox user={userData} onUserSelect={handleSelectedUserFromSearch}/>
       </div>
       <div className="flex flex-1">
         <Sidebar users={usersList} onUserClick={handleUserClick} />

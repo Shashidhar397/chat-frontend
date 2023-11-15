@@ -1,6 +1,6 @@
 import { stringify } from 'querystring';
 import React, { useEffect, useState } from 'react';
-import { Message, User } from '../../../types/type';
+import { Message, MessageStatus, MessageType, User } from '../../../types/type';
 import { post } from '../../../utils/apiUtils';
 
 
@@ -22,13 +22,22 @@ function ChatPage({ user, recipient, chatMessages, onSendMessage}: ChatPageProps
 
     const message = {
       content: newMessage,  
-      sender: user,
-      recipient: recipient
+      senderUuid: user?.uuid,
+      recipientUuid: recipient?.uuid,
+      messageType: MessageType.TEXT,
+      messageStatus: MessageStatus.SENT
     };
 
-    post<Message>("/sendMessage", message, undefined, "http://localhost:8081").then(response => {
+    post<Message>("/sendMessage", message, undefined, "http://localhost:8083").then(response => {
       console.log("Success");
-      onSendMessage(response);
+      onSendMessage({
+        uuid: response.uuid,
+        content: response.content,
+        sender: user!,
+        recipient: recipient!,
+        messageType: response.messageType,
+        messageStatus: response.messageStatus
+      });
       setNewMessage('');
     })
 
@@ -53,8 +62,8 @@ function ChatPage({ user, recipient, chatMessages, onSendMessage}: ChatPageProps
     <div className="flex flex-col flex-1 p-4 border-l border-gray-300">
       <div className="flex-1 border p-4">
   {Array.from(messages).map((message, index) => (
-    <div key={index} className={`mb-2 ${message?.sender?.uuid === user?.uuid ? 'text-blue-500 text-right' : 'text-green-500 text-left'}`}>
-      <strong>{message?.sender?.userName}:</strong> {message.content}
+    <div key={index} className={`mb-2 ${message?.sender.uuid === user?.uuid ? 'text-blue-500 text-right' : 'text-green-500 text-left'}`}>
+      <strong>{message?.sender.uuid === user?.uuid ? user?.userName : recipient?.userName}:</strong> {message.content}
     </div>
   ))}
 </div>

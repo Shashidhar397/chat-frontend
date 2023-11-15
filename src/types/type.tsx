@@ -10,9 +10,24 @@ export type Error = {
 
 export interface Message {
     uuid: string;
-    sender: User | null;
     content: string;
-    recipient: User | null;
+    sender: User;
+    recipient: User;
+    messageType: MessageType;
+    messageStatus: MessageStatus;
+  }
+
+  export enum MessageType {
+    TEXT = 'TEXT',
+IMAGE = 'IMAGE',
+VIDEO = 'VIDEO',
+FILE = 'FILE',
+  }
+
+  export enum MessageStatus {
+    SENT = 'SENT',
+    DELIVERED = 'DELIVERED',
+    SEEN = 'SEEN',
   }
 
   export interface ChatSessionResponse {
