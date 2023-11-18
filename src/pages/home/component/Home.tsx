@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom';
 import Button from '../../../components/Button';
-import { ChatSessionResponse, Message, User } from '../../../types/type';
+import { ChatSessionResponse, Conversation, ConversationHistory, ConversationsAndUser, Message, User } from '../../../types/type';
 import { get } from '../../../utils/apiUtils';
 import ChatPage from './ChatPage';
 import Sidebar from './Sidebar';
@@ -9,15 +9,17 @@ import Stomp, { Client } from 'stompjs';
 import SockJS from 'sockjs-client';
 import Select from 'react-select';
 import SearchBox from './SearchBox';
+import { CHAT_SERVICE_APP } from '../../../utils/constants';
 
 
 const initialStompClient: Client | null = null;
+
 
 function Home() {
 
 
 
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedConversationAndUser, setConversationAndUser] = useState<ConversationsAndUser | null>(null);
 
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [selectedOption, setSelectedOption] = useState<User | null>(null);
@@ -25,35 +27,64 @@ function Home() {
   const location = useLocation();
   const userData = location.state.userData;
 
-  const users: User[] = [
+  const conversationsAndUser: ConversationsAndUser[] = [
   ];
-  const [usersList, setUsersList] = useState(users);
+  const [conversationsAndUserList, setConversationsAndUserList] = useState(conversationsAndUser);
   const [stompClient, setStompClient] = useState(initialStompClient);
   const [userMessages, setUserMessages] = useState<{ [uuid: string]: Message[] }>({});
 
-  const handleSentMessages = (message: Message) => {
-    console.log("Message" + JSON.stringify(message));
+  const [dummyConversationToUser, setDummyConversationToUser] = useState<any>();
+
+  const handleSentMessages = (message: Message, conversationAndUser: ConversationsAndUser | null) => {
     const newMessage = {
       uuid: message.uuid,
       content: message.content,
       sender: message.sender,
       recipient: message.recipient,
       messageType: message.messageType,
-      messageStatus: message.messageStatus
+      messageStatus: message.messageStatus,
+      conversationUuid: message.conversationUuid
     }
+    if(conversationAndUser && !conversationAndUser.conversationUuid) {
+      const index = conversationsAndUserList.indexOf(conversationAndUser);
+      conversationAndUser.conversationUuid = message.conversationUuid;
+      conversationsAndUserList[index] = conversationAndUser;
+      setConversationsAndUserList(conversationsAndUserList);
+    }
+
+    const conversationUuid = message.conversationUuid || '';
+    
     setUserMessages((prevUserMessages) => {
 
       return {
         ...prevUserMessages,
-        [message.recipient.uuid]: [...(prevUserMessages[message.recipient.uuid] || []), newMessage],
+        [conversationUuid]: [...(prevUserMessages[conversationUuid] || []), newMessage],
       };
     });
   }
 
+
+  useEffect(() => {
+    const conversations = get<ConversationHistory>("/chatHistory/" + userData.uuid, undefined, CHAT_SERVICE_APP).then(response => {
+          const conversationMessages: any = [];
+          const conversationAndUsersArr: ConversationsAndUser[] =  [];
+          response.conversations.forEach(conversation => {
+            const toUser = conversation?.participants?.filter(user => user.uuid !== userData.uuid)[0];
+            userMessages[conversation.uuid] = conversation.messages;
+            console.log('To user: '+toUser.userName);
+            conversationAndUsersArr.push({toUser: toUser, conversationUuid: conversation.uuid});
+          });
+
+          setConversationsAndUserList([...conversationsAndUserList, ...conversationAndUsersArr]);
+          setUserMessages(userMessages);
+
+      });
+  }, [])
+
   useEffect(() => {
     // Create a SockJS connection to your WebSocket server
     if (userData) {
-      const sock = new SockJS('http://localhost:8083/ws');
+      const sock = new SockJS(CHAT_SERVICE_APP+'/ws');
 
       // Initialize the STOMP client
       const stomp = Stomp.over(sock);
@@ -62,59 +93,55 @@ function Home() {
 
         stomp.send("/chat-service/chat.addUser", {}, JSON.stringify({ uuid: userData.uuid, type: 'JOIN' }));
 
-        get<ChatSessionResponse>("/getSession/" + userData.uuid, undefined, "http://localhost:8083").then(response => {
+        get<ChatSessionResponse>("/getSession/" + userData.uuid, undefined, CHAT_SERVICE_APP).then(response => {
           // Subscribe to a chat topic
           stomp.subscribe('/chat-service-private/' + response.sessionId, (message) => {
             // Handle incoming messages
             const messageData = JSON.parse(message.body);
-
-            if (!usersList.some(user => user.uuid === messageData?.sender?.uuid)) {
-              setUsersList(prevUsersList => [...prevUsersList, messageData?.sender]);
-            }
+            // console.log("existing User: "+JSON.stringify(messageData));
+            
+            setDummyConversationToUser({toUser: messageData?.sender, conversationUuid: messageData.conversationUuid});
             setUserMessages((prevUserMessages) => ({
               ...prevUserMessages,
-              [messageData?.sender?.uuid]: [...(prevUserMessages[messageData?.sender?.uuid] || []), messageData],
+              [messageData?.conversationUuid]: [...(prevUserMessages[messageData?.conversationUuid] || []), messageData],
             }));
-            
           });
-        })
-
-
+        });
       });
+      
     }
-  }, [usersList, userData]);
+  }, [userData]);
+
+  useEffect(() => {
+    if(dummyConversationToUser) {
+      const existingUser = conversationsAndUserList.find(conversationAndUser => conversationAndUser?.toUser.uuid === dummyConversationToUser?.toUser?.uuid);
+            console.log("existing User: "+JSON.stringify(conversationsAndUserList));
+            if (!existingUser) {
+              setConversationsAndUserList([...conversationsAndUserList, dummyConversationToUser]);
+            }
+    }
+  }, [dummyConversationToUser]);
 
   useEffect(() => {
     // Create a SockJS connection to your WebSocket server
-    console.log("UserMessages: " + JSON.stringify(userMessages));
-  }, [userMessages]);
+  }, [conversationsAndUserList]);
 
-  const handleUserClick = (user: User) => {
-    setSelectedUser(user);
+
+  const handleUserClick = (conversationAndUser: ConversationsAndUser) => {
+    setConversationAndUser(conversationAndUser);
   };
 
   const handleSelectedUserFromSearch = (searchUser: User) => {
-    console.log("Selected user: "+JSON.stringify(searchUser));
-    console.log("usersList user: "+JSON.stringify(usersList));
-    if (searchUser && !usersList.some(user => searchUser.uuid === user.uuid)) {
-      console.log("coming here");
-      setUsersList(prevUsersList => [...prevUsersList, searchUser]);
+    if (searchUser && !conversationsAndUser.some(conversationAndUser => searchUser.uuid === conversationAndUser.toUser.uuid)) {
+      const searchUserAndConv : ConversationsAndUser = {
+        toUser: searchUser
+      }
+      setConversationsAndUserList(prevConversationsAndUserList => [...prevConversationsAndUserList, searchUserAndConv]);
     }
-    console.log("usersList user: "+JSON.stringify(usersList));
   };
 
   const [searchTerm, setSearchTerm] = useState('');
 
-  const handleSearchUser = (event: any) => {
-    if (event.target.value !== userData.email) {
-      const searchResponse = get<User[]>("/users/searchUser?searchTerm=" + event.target.value);
-      searchResponse.then(response => {
-        console.log("Response : " + JSON.stringify(response));
-
-      })
-    }
-
-  };
   const handleUserSelect = (selected: User | null) => {
     setSelectedOption(selected);
   };
@@ -126,8 +153,8 @@ function Home() {
         <SearchBox user={userData} onUserSelect={handleSelectedUserFromSearch}/>
       </div>
       <div className="flex flex-1">
-        <Sidebar users={usersList} onUserClick={handleUserClick} />
-        <ChatPage user={userData} recipient={selectedUser} chatMessages={userMessages[selectedUser?.uuid || '']} onSendMessage={handleSentMessages} />
+        <Sidebar conversationsAndUser={conversationsAndUserList} onUserClick={handleUserClick} />
+        <ChatPage user={userData} selectedConversationAndUser={selectedConversationAndUser} recipient={selectedConversationAndUser?.toUser || null} chatMessages={userMessages[selectedConversationAndUser?.conversationUuid || '']} onSendMessage={handleSentMessages} />
       </div>
     </div>
   );

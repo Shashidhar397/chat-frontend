@@ -15,6 +15,7 @@ export interface Message {
     recipient: User;
     messageType: MessageType;
     messageStatus: MessageStatus;
+    conversationUuid?: string;
   }
 
   export enum MessageType {
@@ -34,3 +35,19 @@ FILE = 'FILE',
     uuid: string;
     sessionId: string;
   }
+  export interface Conversation{
+    uuid: string;
+    messages: Message[];
+    participants: User[];
+  }
+
+  export interface ConversationHistory {
+    conversations: Conversation[];
+  }
+
+  export interface ConversationsAndUser {
+    conversationUuid?: string;
+    toUser: User
+  }
+
+ 

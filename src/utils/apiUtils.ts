@@ -1,7 +1,8 @@
 import axios, { AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
+import { USER_SERVICE_APP } from './constants';
 
 // Default base URL
-const defaultBaseURL = 'http://localhost:8082'; // Replace with your default base URL
+const defaultBaseURL = USER_SERVICE_APP; // Replace with your default base URL
 
 // Create an instance of Axios with a custom configuration
 const api = axios.create({

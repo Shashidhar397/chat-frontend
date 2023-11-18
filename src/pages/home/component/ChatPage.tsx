@@ -1,6 +1,6 @@
 import { stringify } from 'querystring';
 import React, { useEffect, useState } from 'react';
-import { Message, MessageStatus, MessageType, User } from '../../../types/type';
+import { ConversationsAndUser, Message, MessageStatus, MessageType, User } from '../../../types/type';
 import { post } from '../../../utils/apiUtils';
 
 
@@ -9,35 +9,35 @@ interface ChatPageProps {
   user: User | null; // Make user nullable to handle no user selected
   recipient: User | null; // Make recipient nullable to handle no recipient selected
   chatMessages:Message[];
-  onSendMessage: (message: Message) => void;
+  selectedConversationAndUser: ConversationsAndUser | null;
+  onSendMessage: (message: Message, selectedConversationAndUser: ConversationsAndUser | null) => void;
 }
 
-function ChatPage({ user, recipient, chatMessages, onSendMessage}: ChatPageProps) {
+function ChatPage({ user, recipient, chatMessages, selectedConversationAndUser, onSendMessage}: ChatPageProps) {
   const [messages, setMessages] = useState<Set<Message>>(new Set());
   const [newMessage, setNewMessage] = useState('');
-  console.log("ChatMessages"+JSON.stringify(chatMessages));
 
   const handleSendMessage = () => {
     if (newMessage.trim() === '') return;
-
     const message = {
       content: newMessage,  
       senderUuid: user?.uuid,
       recipientUuid: recipient?.uuid,
       messageType: MessageType.TEXT,
-      messageStatus: MessageStatus.SENT
+      messageStatus: MessageStatus.SENT,
+      conversationUuid: selectedConversationAndUser?.conversationUuid
     };
 
     post<Message>("/sendMessage", message, undefined, "http://localhost:8083").then(response => {
-      console.log("Success");
       onSendMessage({
         uuid: response.uuid,
         content: response.content,
         sender: user!,
         recipient: recipient!,
         messageType: response.messageType,
-        messageStatus: response.messageStatus
-      });
+        messageStatus: response.messageStatus,
+        conversationUuid: response.conversationUuid
+      }, selectedConversationAndUser);
       setNewMessage('');
     })
 
@@ -63,7 +63,7 @@ function ChatPage({ user, recipient, chatMessages, onSendMessage}: ChatPageProps
       <div className="flex-1 border p-4">
   {Array.from(messages).map((message, index) => (
     <div key={index} className={`mb-2 ${message?.sender.uuid === user?.uuid ? 'text-blue-500 text-right' : 'text-green-500 text-left'}`}>
-      <strong>{message?.sender.uuid === user?.uuid ? user?.userName : recipient?.userName}:</strong> {message.content}
+      <strong>{message?.sender.uuid === user?.uuid ? 'You' : recipient?.userName}:</strong> {message.content}
     </div>
   ))}
 </div>
