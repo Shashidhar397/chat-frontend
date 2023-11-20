@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom';
 import Button from '../../../components/Button';
-import { ChatSessionResponse, Conversation, ConversationHistory, ConversationsAndUser, Message, User } from '../../../types/type';
-import { get } from '../../../utils/apiUtils';
+import { ChatSessionResponse, Conversation, ConversationHistory, ConversationsAndUser, Message, MessageStatus, User } from '../../../types/type';
+import { get, post } from '../../../utils/apiUtils';
 import ChatPage from './ChatPage';
 import Sidebar from './Sidebar';
 import Stomp, { Client } from 'stompjs';
@@ -32,6 +32,7 @@ function Home() {
   const [conversationsAndUserList, setConversationsAndUserList] = useState(conversationsAndUser);
   const [stompClient, setStompClient] = useState(initialStompClient);
   const [userMessages, setUserMessages] = useState<{ [uuid: string]: Message[] }>({});
+  const [messageUpdate, setMessageUpdate] = useState<Message>();
 
   const [dummyConversationToUser, setDummyConversationToUser] = useState<any>();
 
@@ -100,13 +101,27 @@ function Home() {
             const messageData = JSON.parse(message.body);
             // console.log("existing User: "+JSON.stringify(messageData));
             
-            setDummyConversationToUser({toUser: messageData?.sender, conversationUuid: messageData.conversationUuid});
-            setUserMessages((prevUserMessages) => ({
-              ...prevUserMessages,
-              [messageData?.conversationUuid]: [...(prevUserMessages[messageData?.conversationUuid] || []), messageData],
-            }));
+            if(messageData.messageStatus === MessageStatus.SENT) {
+              messageData.messageStatus = MessageStatus.DELIVERED;
+              setDummyConversationToUser({toUser: messageData?.sender, conversationUuid: messageData.conversationUuid});
+              setUserMessages((prevUserMessages) => ({
+                ...prevUserMessages,
+                [messageData?.conversationUuid]: [...(prevUserMessages[messageData?.conversationUuid] || []), messageData],
+              }));
+              post("/updateMessageStatus", messageData, undefined, CHAT_SERVICE_APP).then(response => {
+                console.log("Response from update Message:"+response);
+              })
+            }
+            
+          });
+          stomp.subscribe('/chat-service-private/' + response.sessionId +'/message-updates', (message) => {
+            const messageData = JSON.parse(message.body);
+            console.log('MEssage status update : '+messageData);
+              setMessageUpdate(messageData);
           });
         });
+
+
       });
       
     }
@@ -115,7 +130,6 @@ function Home() {
   useEffect(() => {
     if(dummyConversationToUser) {
       const existingUser = conversationsAndUserList.find(conversationAndUser => conversationAndUser?.toUser.uuid === dummyConversationToUser?.toUser?.uuid);
-            console.log("existing User: "+JSON.stringify(conversationsAndUserList));
             if (!existingUser) {
               setConversationsAndUserList([...conversationsAndUserList, dummyConversationToUser]);
             }
@@ -123,8 +137,18 @@ function Home() {
   }, [dummyConversationToUser]);
 
   useEffect(() => {
-    // Create a SockJS connection to your WebSocket server
-  }, [conversationsAndUserList]);
+    if(messageUpdate) {
+      const conversationKey : string = messageUpdate?.conversationUuid || '';
+      const existingMessageIndex = userMessages[conversationKey]?.findIndex(message => messageUpdate.uuid === message.uuid);
+      console.log('Exist: '+existingMessageIndex);
+      if (existingMessageIndex && existingMessageIndex !== -1) {
+        const existingArrayMessage : Message[] = userMessages[conversationKey];
+        userMessages[conversationKey][existingMessageIndex] = messageUpdate;
+        setUserMessages(userMessages);
+        console.log('updated message : '+JSON.stringify(userMessages[conversationKey]));
+      }
+    }
+  }, [messageUpdate]);
 
 
   const handleUserClick = (conversationAndUser: ConversationsAndUser) => {
