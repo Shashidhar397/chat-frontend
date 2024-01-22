@@ -99,7 +99,7 @@ function Home() {
           stomp.subscribe('/chat-service-private/' + response.sessionId, (message) => {
             // Handle incoming messages
             const messageData = JSON.parse(message.body);
-            // console.log("existing User: "+JSON.stringify(messageData));
+            console.log("existing User: "+JSON.stringify(messageData));
             
             if(messageData.messageStatus === MessageStatus.SENT) {
               messageData.messageStatus = MessageStatus.DELIVERED;
@@ -116,7 +116,7 @@ function Home() {
           });
           stomp.subscribe('/chat-service-private/' + response.sessionId +'/message-updates', (message) => {
             const messageData = JSON.parse(message.body);
-            console.log('MEssage status update : '+messageData);
+            console.log("Updated status: "+JSON.stringify(messageData));
               setMessageUpdate(messageData);
           });
         });
@@ -140,12 +140,14 @@ function Home() {
     if(messageUpdate) {
       const conversationKey : string = messageUpdate?.conversationUuid || '';
       const existingMessageIndex = userMessages[conversationKey]?.findIndex(message => messageUpdate.uuid === message.uuid);
-      console.log('Exist: '+existingMessageIndex);
       if (existingMessageIndex && existingMessageIndex !== -1) {
-        const existingArrayMessage : Message[] = userMessages[conversationKey];
-        userMessages[conversationKey][existingMessageIndex] = messageUpdate;
-        setUserMessages(userMessages);
-        console.log('updated message : '+JSON.stringify(userMessages[conversationKey]));
+        setUserMessages((prevUserMessages) => {
+          const temp = { ...prevUserMessages };
+          const existingArrayMessage: Message[] = temp[conversationKey];
+          existingArrayMessage[existingMessageIndex] = messageUpdate;
+          temp[conversationKey] = existingArrayMessage;
+          return temp;
+        });
       }
     }
   }, [messageUpdate]);

@@ -59,15 +59,29 @@ function ChatPage({ user, recipient, chatMessages, selectedConversationAndUser, 
     setMessages(prevSet => new Set([...prevSet, ...chatMessages]));
   }, [chatMessages]);
 
+  const senderName = user?.userName || 'You';
+  const contactName = recipient?.userName || 'Recipient';
+
   return (
     <div className="flex flex-col flex-1 p-4 border-l border-gray-300">
+      <div className="mb-4 text-center z-10">
+        <h2 className="text-lg font-semibold">{contactName}</h2>
+      </div>
       <div className="flex-1 border p-4">
         {Array.from(messages).map((message, index) => (
-          <div key={index} className={`mb-2 ${message?.sender.uuid === user?.uuid ? 'text-blue-500 text-right' : 'text-green-500 text-left'}`}>
-            <strong>{message?.sender.uuid === user?.uuid ? 'You' : recipient?.userName}:</strong> {message.content}
-            {
-              message?.sender.uuid === user?.uuid ? renderMessageStatus(message.messageStatus) : ''
-            }
+          <div
+            key={index}
+            className={`mb-2 ${message?.sender.uuid === user?.uuid ? 'flex justify-end' : 'flex justify-start'}`}
+          >             <div
+            className={`p-3 rounded-lg ${message?.sender.uuid === user?.uuid ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'
+              }`}
+          >
+              {message.content}
+              {
+                message?.sender.uuid === user?.uuid ? renderMessageStatus(message.messageStatus) : ''
+              }
+            </div>
+
 
           </div>
         ))}
